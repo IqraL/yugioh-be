@@ -1,4 +1,4 @@
-export const levels = [1, 2, 3, 4, 5, 6, 7, 8];
+export const levels = ["1", "2", "3", "4", "5", "6", "7", "8"];
 export const attributes = [
   "dark",
   "earth",
@@ -81,3 +81,13 @@ const spellRace = [
 export const trapRace = ["Normal", "Continuous", "Counter"];
 
 export const allRaces = [...monsterRace, ...spellRace, ...trapRace];
+
+export const sortingValues = [
+  "atk",
+  "def",
+  "name",
+  "type",
+  "level",
+  "id",
+  "new",
+];

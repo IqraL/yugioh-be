@@ -1,9 +1,10 @@
 import express, { Request } from "express";
 import cors from "cors";
+import axios from "axios";
 import dotenv from "dotenv";
 dotenv.config();
 
-import { levels, allRaces, attributes, types } from "./values";
+import { levels, allRaces, attributes, types, sortingValues } from "./values";
 
 const app = express();
 const port = 3000;
@@ -36,8 +37,65 @@ app.get("/get-allRaces", (req, res) => {
   res.send(allRaces);
 });
 
-app.post("/cards", (req: Request<{},{},{}>, res) => {
-  res.send(allRaces);
+type SearchParams = {
+  fname?: string;
+  type?: string;
+  attribute?: string;
+  race?: string;
+  level?: string;
+  sort?: string;
+  page: number;
+};
+
+app.post("/cards", async (req: Request<{}, {}, SearchParams>, res) => {
+ try {
+   const { fname, type, attribute, race, level, sort, page = 1 } = req.body;
+
+   // Validate input helper
+   const validate = (value: any, validList: any[], name: string) => {
+     if (value !== undefined && !validList.includes(value)) {
+       throw new Error(
+         `Invalid ${name}, please pick from: ${validList.join(", ")}`
+       );
+     }
+   };
+
+   // Validate each field
+   validate(type, types, "type");
+   validate(attribute, attributes, "attribute");
+   validate(race, allRaces, "race");
+   validate(level, levels, "level");
+   validate(sort, sortingValues, "sorting value");
+
+   // Build params
+   const params: Record<string, string | number> = {
+     num: 50,
+     offset: (page - 1) * 50,
+     ...(fname && { fname }),
+     ...(type && { type }),
+     ...(attribute && { attribute }),
+     ...(race && { race }),
+     ...(level && { level }),
+     ...(sort && { sort }),
+   };
+
+   // Convert to query string
+   const queryString = new URLSearchParams(
+     params as Record<string, string>
+   ).toString();
+
+   // Fetch from API
+   const response = await axios.get(
+     `https://db.ygoprodeck.com/api/v7/cardinfo.php?${queryString}`
+   );
+
+   res.send(response.data);
+ } catch (error: any) {
+   res.send({
+     error: `An error occurred while fetching data. ${error.message}`,
+   });
+ }
+
 });
 
 app.listen(port, () => {
