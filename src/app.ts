@@ -4,38 +4,29 @@ import axios from "axios";
 import dotenv from "dotenv";
 dotenv.config();
 
-import { levels, allRaces, attributes, types, sortingValues } from "./values";
+import { staticValuesRouter } from "./routes";
+import {
+  levels,
+  allRaces,
+  attributes,
+  types,
+  sortingValues,
+  archetypes,
+} from "./values";
 
 const app = express();
 const port = 3000;
 
-app.use(
-  cors({
-    origin: ["http://localhost:8000", "http://localhost:4000"], // Update this to your frontend URL
-    credentials: true,
-  })
-);
 
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded());
 
 app.get("/", (req, res) => {
-  res.send("Hello World!");
+  res.send("hello world");
 });
 
-app.get("/get-levels", (req, res) => {
-  res.send(levels);
-});
-
-app.get("/get-attributes", (req, res) => {
-  res.send(attributes);
-});
-app.get("/get-types", (req, res) => {
-  res.send(types);
-});
-app.get("/get-allRaces", (req, res) => {
-  res.send(allRaces);
-});
+app.use(staticValuesRouter);
 
 type SearchParams = {
   fname?: string;
@@ -43,59 +34,78 @@ type SearchParams = {
   attribute?: string;
   race?: string;
   level?: string;
+  archetype?: string;
   sort?: string;
   page: number;
 };
 
 app.post("/cards", async (req: Request<{}, {}, SearchParams>, res) => {
- try {
-   const { fname, type, attribute, race, level, sort, page = 1 } = req.body;
+  try {
+    const {
+      fname,
+      type,
+      attribute,
+      race,
+      level,
+      archetype,
+      sort,
+      page = 1,
+    } = req.body;
 
-   // Validate input helper
-   const validate = (value: any, validList: any[], name: string) => {
-     if (value !== undefined && !validList.includes(value)) {
-       throw new Error(
-         `Invalid ${name}, please pick from: ${validList.join(", ")}`
-       );
-     }
-   };
 
-   // Validate each field
-   validate(type, types, "type");
-   validate(attribute, attributes, "attribute");
-   validate(race, allRaces, "race");
-   validate(level, levels, "level");
-   validate(sort, sortingValues, "sorting value");
+    const validate = (value: any, validList: any[], name: string) => {
+      if (value === undefined || value === null || value === "") {
+        return; // Allow undefined values (optional fields)
+      }
 
-   // Build params
-   const params: Record<string, string | number> = {
-     num: 50,
-     offset: (page - 1) * 50,
-     ...(fname && { fname }),
-     ...(type && { type }),
-     ...(attribute && { attribute }),
-     ...(race && { race }),
-     ...(level && { level }),
-     ...(sort && { sort }),
-   };
+      const isValid = (currentValue: string) =>
+        validList.includes(currentValue.trim());
+      const values = typeof value === "string" ? value.split(",") : [value];
 
-   // Convert to query string
-   const queryString = new URLSearchParams(
-     params as Record<string, string>
-   ).toString();
+      if (!values.every(isValid)) {
+        throw new Error(
+          `Invalid ${name}, please pick from: ${validList.join(", ")}`
+        );
+      }
+    };
 
-   // Fetch from API
-   const response = await axios.get(
-     `https://db.ygoprodeck.com/api/v7/cardinfo.php?${queryString}`
-   );
+    // Validate each field
+    validate(type, types, "type");
+    validate(attribute, attributes, "attribute");
+    validate(race, allRaces, "race");
+    validate(archetype, archetypes, "archetype");
+    validate(level, levels, "level");
+    validate(sort, sortingValues, "sorting value");
 
-   res.send(response.data);
- } catch (error: any) {
-   res.send({
-     error: `An error occurred while fetching data. ${error.message}`,
-   });
- }
+    // Build params
+    const params: Record<string, string | number> = {
+      num: 50,
+      offset: (page - 1) * 50,
+      ...(fname && { fname }),
+      ...(type && { type }),
+      ...(attribute && { attribute }),
+      ...(race && { race }),
+      ...(archetype && { archetype }),
+      ...(level && { level }),
+      ...(sort && { sort }),
+    };
 
+    const queryString = new URLSearchParams(
+      params as Record<string, string>
+    ).toString();
+
+    console.log("Query String:", queryString);
+
+    const response = await axios.get(
+      `https://db.ygoprodeck.com/api/v7/cardinfo.php?${queryString}`
+    );
+
+    res.send(response.data);
+  } catch (error: any) {
+    res.send({
+      error: `An error occurred while fetching data. ${error.message}`,
+    });
+  }
 });
 
 app.listen(port, () => {
