@@ -12,58 +12,61 @@ import cors from "cors";
 import axios from "axios";
 import dotenv from "dotenv";
 dotenv.config();
-import { levels, allRaces, attributes, types } from "./values";
+import { staticValuesRouter } from "./routes";
+import { levels, allRaces, attributes, types, sortingValues, archetypes, } from "./values";
 const app = express();
 const port = 3000;
-app.use(cors({
-    origin: ["http://localhost:8000", "http://localhost:4000"], // Update this to your frontend URL
-    credentials: true,
-}));
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded());
 app.get("/", (req, res) => {
-    res.send("Hello World!");
+    res.send("hello world");
 });
-app.get("/get-levels", (req, res) => {
-    res.send(levels);
-});
-app.get("/get-attributes", (req, res) => {
-    res.send(attributes);
-});
-app.get("/get-types", (req, res) => {
-    res.send(types);
-});
-app.get("/get-allRaces", (req, res) => {
-    res.send(allRaces);
-});
+app.use(staticValuesRouter);
 app.post("/cards", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { fname, type, attribute, race, level, sort, page = 1 } = req.body;
-        const params = {
-            num: 50,
-            fname,
-            type,
-            attribute,
-            race,
-            level,
-            sort,
-            offset: (page - 1) * 50,
+        const { fname, type, attribute, race, level, archetype, sort, page = 1, } = req.body;
+        const validate = (value, validList, name) => {
+            if (value === undefined || value === null || value === "") {
+                return; // Allow undefined values (optional fields)
+            }
+            const isValid = (currentValue) => validList.includes(currentValue.trim());
+            const values = typeof value === "string" ? value.split(",") : [value];
+            if (!values.every(isValid)) {
+                throw new Error(`Invalid ${name}, please pick from: ${validList.join(", ")}`);
+            }
         };
-        if (type && !types.includes(type)) {
-            throw new Error(`Invalid type, please pick from: ${types.join(", ")}`);
-        }
-        const queryString = Object.entries(params)
-            .filter(([, value]) => value !== undefined)
-            .map(([key, value]) => `${key}=${value}`)
-            .join("&");
+        // Validate each field
+        validate(type, types, "type");
+        validate(attribute, attributes, "attribute");
+        validate(race, allRaces, "race");
+        validate(archetype, archetypes, "archetype");
+        validate(level, levels, "level");
+        validate(sort, sortingValues, "sorting value");
+        // Build params
+        const params = Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({ num: 50, offset: (page - 1) * 50 }, (fname && { fname })), (type && { type })), (attribute && { attribute })), (race && { race })), (archetype && { archetype })), (level && { level })), (sort && { sort }));
+        const queryString = new URLSearchParams(params).toString();
+        console.log("Query String:", queryString);
         const response = yield axios.get(`https://db.ygoprodeck.com/api/v7/cardinfo.php?${queryString}`);
         res.send(response.data);
     }
     catch (error) {
         res.send({
-            //@ts-ignore
-            error: `An error occurred while fetching data. ${error.message}`,
+            error: `No data found for this search`,
         });
+    }
+}));
+app.post("/add-owned-card", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { cardId } = req.body;
+        if (!cardId) {
+            return res.status(400).send({ error: "Card ID is required" });
+        }
+        res.send({ success: true });
+    }
+    catch (error) {
+        console.error("Error adding owned card:", error);
+        res.status(500).send({ error: "Failed to add owned card" });
     }
 }));
 app.listen(port, () => {
