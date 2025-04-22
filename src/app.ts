@@ -1,8 +1,21 @@
 import express, { Request, Response } from "express";
+import { jwtDecode } from "jwt-decode";
+import jwt_decode from "jwt-decode";
+
 import cors from "cors";
 import axios from "axios";
 import dotenv from "dotenv";
 dotenv.config();
+
+import { google } from "googleapis";
+import crypto from "crypto";
+import session from "express-session";
+
+declare module "express-session" {
+  interface SessionData {
+    state?: string;
+  }
+}
 
 import { staticValuesRouter } from "./routes";
 import {
@@ -211,16 +224,183 @@ app.post(
       });
 
       if (!existingCardsOwned) {
-        return res.send([])
+        return res.send([]);
       }
-      
+
       res.send(existingCardsOwned.cards);
     } catch (error) {
-       console.error("Error removing owned card:", error);
-       res.send([])
+      console.error("Error removing owned card:", error);
+      res.send([]);
     }
   }
 );
+
+app.get("/auth-url", (req, res) => {
+  const oauth2Client = new google.auth.OAuth2(
+    // CLIENT_ID
+    "755025485514-k75gjh9rqs4ejrniegiu8b6erpvuikne.apps.googleusercontent.com",
+    //YOUR_CLIENT_SECRET,
+    "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",
+    // YOUR_REDIRECT_URL
+    "http://localhost:5173/auth"
+  );
+
+  // Access scopes for two non-Sign-In scopes: Read-only Drive activity and Google Calendar.
+  const scopes = [
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+  ];
+
+  // Generate a secure random state value.
+  // const state = crypto.randomBytes(32).toString("hex");
+
+  // Store state in the session
+
+  // req.session.state = state;
+
+  // Generate a url that asks permissions for the Drive activity and Google Calendar scope
+  const authorizationUrl = oauth2Client.generateAuthUrl({
+    // 'online' (default) or 'offline' (gets refresh_token)
+    access_type: "offline",
+    /** Pass in the scopes array defined above.
+     * Alternatively, if only one scope is needed, you can pass a scope URL as a string */
+    scope: scopes,
+    // Enable incremental authorization. Recommended as a best practice.
+    include_granted_scopes: true,
+    // // Include the state parameter to reduce the risk of CSRF attacks.
+    // state: state,
+  });
+
+  res.send({ authorizationUrl });
+});
+
+type UserInfo = {
+  iss: string;
+  azp: string;
+  aud: string;
+  sub: string;
+  email: string;
+  email_verified: boolean;
+  at_hash: string;
+  name: string;
+  picture: string;
+  given_name: string;
+  family_name: string;
+  iat: number;
+  exp: number;
+};
+
+app.post("/get-tokens", async (req: Request<{}, {}, { code: string }>, res) => {
+  const { code } = req.body;
+  console.log("code", code);
+  const oauth2Client = new google.auth.OAuth2(
+    // CLIENT_ID
+    "755025485514-k75gjh9rqs4ejrniegiu8b6erpvuikne.apps.googleusercontent.com",
+    //YOUR_CLIENT_SECRET,
+    "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",
+    // YOUR_REDIRECT_URL
+    "http://localhost:5173/auth"
+  );
+
+  let { tokens, ...value } = await oauth2Client.getToken(code as string);
+
+  const idToken = tokens.id_token;
+  const userinfo: UserInfo = jwtDecode(idToken || "");
+
+  const { email, name, picture } = userinfo;
+  const formattedEmail = email.toLowerCase();
+
+  const dbClient = await MongoDbClient.getClient();
+  const collection = dbClient.db("yugioh").collection("users");
+
+  const existingUser = await collection.findOne({
+    email: formattedEmail,
+  });
+
+  if (!existingUser) {
+    await collection.insertOne({
+      email: formattedEmail,
+      name,
+      picture,
+      ...tokens,
+    });
+  }
+  if (existingUser) {
+    await collection.updateOne(
+      { formattedEmail },
+      {
+        $set: {
+          email: formattedEmail,
+          name,
+          picture,
+          ...tokens,
+        },
+      }
+    );
+  }
+
+  console.log("jwtToken:tokens.id_token", tokens.id_token);
+  res.send({
+    success: true,
+    jwtToken: tokens.id_token,
+    email: formattedEmail,
+    name,
+    picture,
+  });
+});
+
+type JwtPayload = {
+  exp: number;
+  [key: string]: any;
+};
+app.post("/verify-token", async (req, res) => {
+  try {
+    const headers = req.headers;
+    const { email } = req.body;
+
+    const token = headers["authorization"]?.split(" ")[1] || "";
+
+    if (!token || !email) {
+      return res
+        .status(401)
+        .send({ validJwt: false, error: "No token or user provided" });
+    }
+
+    const payloadBase64 = token.split(".")[1];
+    const payloadJson = Buffer.from(payloadBase64, "base64").toString("utf-8");
+    const payload = JSON.parse(payloadJson);
+
+    const currentTime = Math.floor(Date.now() / 1000);
+
+    if (!payload.exp || currentTime >= payload.exp) {
+      return res.send({ validJwt: false });
+    }
+
+    const formattedEmail = email.toLowerCase();
+
+    const dbClient = await MongoDbClient.getClient();
+    const collection = dbClient.db("yugioh").collection("users");
+
+    const existingUser = await collection.findOne({
+      email: formattedEmail,
+    });
+
+    if (!existingUser) {
+      return res.send({ validJwt: false });
+    }
+
+    if (existingUser.id_token?.trim() !== token.trim()) {
+      return res.send({ validJwt: false });
+    }
+
+    return res.send({ validJwt: true });
+  } catch (error) {
+    console.error("Invalid JWT", error);
+    return res.status(400).send({ validJwt: false, error: "Invalid JWT" });
+  }
+});
+//verify token https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=<access_token>
+
 app.listen(port, () => {
   return console.log(`Express is listening at http://localhost:${port}`);
 });
