@@ -327,7 +327,7 @@ app.post("/get-tokens", async (req: Request<{}, {}, { code: string }>, res) => {
   }
   if (existingUser) {
     await collection.updateOne(
-      { formattedEmail },
+      { email: formattedEmail },
       {
         $set: {
           email: formattedEmail,
@@ -339,7 +339,6 @@ app.post("/get-tokens", async (req: Request<{}, {}, { code: string }>, res) => {
     );
   }
 
-  console.log("jwtToken:tokens.id_token", tokens.id_token);
   res.send({
     success: true,
     jwtToken: tokens.id_token,
@@ -385,11 +384,12 @@ app.post("/verify-token", async (req, res) => {
       email: formattedEmail,
     });
 
+
     if (!existingUser) {
       return res.send({ validJwt: false });
     }
 
-    if (existingUser.id_token?.trim() !== token.trim()) {
+    if (existingUser.id_token !== token) {
       return res.send({ validJwt: false });
     }
 
