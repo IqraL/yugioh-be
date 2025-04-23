@@ -29,7 +29,7 @@ import {
 import { MongoDbClient } from "./db/mongodbclient";
 
 const app = express();
-const port = 3000;
+const port = process.env.port || 3000;
 
 app.use(cors());
 app.use(express.json());
@@ -236,24 +236,17 @@ app.post(
 );
 
 app.get("/auth-url", (req, res) => {
+
   const oauth2Client = new google.auth.OAuth2(
     OAUTH_CLIENT_ID,
     OAUTH_CLIENT_SECRET,
     OAUTH_REDIRECT_URL
   );
 
-  // Access scopes for two non-Sign-In scopes: Read-only Drive activity and Google Calendar.
   const scopes = [
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
   ];
-
-  // Generate a secure random state value.
-  // const state = crypto.randomBytes(32).toString("hex");
-
-  // Store state in the session
-
-  // req.session.state = state;
 
   // Generate a url that asks permissions for the Drive activity and Google Calendar scope
   const authorizationUrl = oauth2Client.generateAuthUrl({
@@ -289,7 +282,7 @@ type UserInfo = {
 
 app.post("/get-tokens", async (req: Request<{}, {}, { code: string }>, res) => {
   const { code } = req.body;
-  console.log("code", code);
+ 
   const oauth2Client = new google.auth.OAuth2(
     OAUTH_CLIENT_ID,
     OAUTH_CLIENT_SECRET,
@@ -342,10 +335,6 @@ app.post("/get-tokens", async (req: Request<{}, {}, { code: string }>, res) => {
   });
 });
 
-type JwtPayload = {
-  exp: number;
-  [key: string]: any;
-};
 app.post("/verify-token", async (req, res) => {
   try {
     const headers = req.headers;
@@ -392,7 +381,6 @@ app.post("/verify-token", async (req, res) => {
     return res.status(400).send({ validJwt: false, error: "Invalid JWT" });
   }
 });
-//verify token https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=<access_token>
 
 app.listen(port, () => {
   return console.log(`Express is listening at http://localhost:${port}`);
