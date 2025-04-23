@@ -106,7 +106,6 @@ app.post("/cards", async (req: Request<{}, {}, SearchParams>, res) => {
       params as Record<string, string>
     ).toString();
 
-    console.log("Query String:", queryString);
 
     const response = await axios.get(
       `https://db.ygoprodeck.com/api/v7/cardinfo.php?${queryString}`
