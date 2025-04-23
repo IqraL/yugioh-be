@@ -163,8 +163,6 @@ app.post(
         );
       }
 
-      console.log("existingCardsOwned", existingCardsOwned);
-
       res.send({ success: true });
     } catch (error) {
       console.error("Error adding owned card:", error);
@@ -238,11 +236,11 @@ app.post(
 app.get("/auth-url", (req, res) => {
   const oauth2Client = new google.auth.OAuth2(
     // CLIENT_ID
-    "755025485514-k75gjh9rqs4ejrniegiu8b6erpvuikne.apps.googleusercontent.com",
+    process.env.OAuthClientId,
     //YOUR_CLIENT_SECRET,
-    "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",
+    process.env.OAuthClientSecret,
     // YOUR_REDIRECT_URL
-    "http://localhost:5173/auth"
+    process.env.OAuthRedirectUri,
   );
 
   // Access scopes for two non-Sign-In scopes: Read-only Drive activity and Google Calendar.
@@ -295,11 +293,11 @@ app.post("/get-tokens", async (req: Request<{}, {}, { code: string }>, res) => {
   console.log("code", code);
   const oauth2Client = new google.auth.OAuth2(
     // CLIENT_ID
-    "755025485514-k75gjh9rqs4ejrniegiu8b6erpvuikne.apps.googleusercontent.com",
+    process.env.OAuthClientId,
     //YOUR_CLIENT_SECRET,
-    "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",
+    process.env.OAuthClientSecret,
     // YOUR_REDIRECT_URL
-    "http://localhost:5173/auth"
+    process.env.OAuthRedirectUri
   );
 
   let { tokens, ...value } = await oauth2Client.getToken(code as string);
