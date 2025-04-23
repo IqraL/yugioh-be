@@ -41,6 +41,10 @@ app.get("/", (req, res) => {
 
 app.use(staticValuesRouter);
 
+const OAUTH_CLIENT_ID = process.env.OAuthClientId;
+const OAUTH_CLIENT_SECRET = process.env.OAuthClientSecret;
+const OAUTH_REDIRECT_URL = process.env.OAuthRedirectUri;
+
 type SearchParams = {
   fname?: string;
   type?: string;
@@ -105,7 +109,6 @@ app.post("/cards", async (req: Request<{}, {}, SearchParams>, res) => {
     const queryString = new URLSearchParams(
       params as Record<string, string>
     ).toString();
-
 
     const response = await axios.get(
       `https://db.ygoprodeck.com/api/v7/cardinfo.php?${queryString}`
@@ -234,12 +237,9 @@ app.post(
 
 app.get("/auth-url", (req, res) => {
   const oauth2Client = new google.auth.OAuth2(
-    // CLIENT_ID
-    process.env.OAuthClientId,
-    //YOUR_CLIENT_SECRET,
-    process.env.OAuthClientSecret,
-    // YOUR_REDIRECT_URL
-    process.env.OAuthRedirectUri,
+    OAUTH_CLIENT_ID,
+    OAUTH_CLIENT_SECRET,
+    OAUTH_REDIRECT_URL
   );
 
   // Access scopes for two non-Sign-In scopes: Read-only Drive activity and Google Calendar.
@@ -291,12 +291,9 @@ app.post("/get-tokens", async (req: Request<{}, {}, { code: string }>, res) => {
   const { code } = req.body;
   console.log("code", code);
   const oauth2Client = new google.auth.OAuth2(
-    // CLIENT_ID
-    process.env.OAuthClientId,
-    //YOUR_CLIENT_SECRET,
-    process.env.OAuthClientSecret,
-    // YOUR_REDIRECT_URL
-    process.env.OAuthRedirectUri
+    OAUTH_CLIENT_ID,
+    OAUTH_CLIENT_SECRET,
+    OAUTH_REDIRECT_URL
   );
 
   let { tokens, ...value } = await oauth2Client.getToken(code as string);
@@ -380,7 +377,6 @@ app.post("/verify-token", async (req, res) => {
     const existingUser = await collection.findOne({
       email: formattedEmail,
     });
-
 
     if (!existingUser) {
       return res.send({ validJwt: false });
