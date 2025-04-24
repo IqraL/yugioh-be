@@ -138,7 +138,7 @@ app.post(
       const dbClient = await client;
       const collection = dbClient.db("yugioh").collection("ownedCards");
       const existingCardsOwned = await collection.findOne({
-        userId,
+        userId: new RegExp(`^${userId}$`, "i"),
       });
 
       if (!existingCardsOwned) {
@@ -157,7 +157,7 @@ app.post(
         }
 
         await collection.updateOne(
-          { userId },
+          { userId: new RegExp(`^${userId}$`, "i") },
           //@ts-ignore
           { $push: { cards: cardId } }
         );
@@ -182,7 +182,7 @@ app.post(
       const dbClient = await client;
       const collection = dbClient.db("yugioh").collection("ownedCards");
       const existingCardsOwned = await collection.findOne({
-        userId,
+        userId: new RegExp(`^${userId}$`, "i"),
       });
       if (!existingCardsOwned) {
         return res.status(400).send({ error: "Card does not exist" });
@@ -195,7 +195,7 @@ app.post(
 
       //@ts-ignore
       const value = await collection.updateOne(
-        { userId },
+        { userId: new RegExp(`^${userId}$`, "i") },
         { $pull: { cards: cardId } }
       );
 
@@ -218,7 +218,7 @@ app.post(
       const dbClient = await client;
       const collection = dbClient.db("yugioh").collection("ownedCards");
       const existingCardsOwned = await collection.findOne({
-        userId,
+        userId: new RegExp(`^${userId}$`, "i"),
       });
 
       if (!existingCardsOwned) {
