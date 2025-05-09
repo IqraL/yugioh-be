@@ -7,15 +7,7 @@ import axios from "axios";
 import dotenv from "dotenv";
 dotenv.config();
 
-
-
-declare module "express-session" {
-  interface SessionData {
-    state?: string;
-  }
-}
-
-import { staticValuesRouter } from "./routes";
+import { staticValuesRouter } from "./routes/index.js";
 import {
   levels,
   allRaces,
@@ -23,8 +15,8 @@ import {
   types,
   sortingValues,
   archetypes,
-} from "./values";
-import { MongoDbClient } from "./db/mongodbclient";
+} from "./routes/values.js";
+import { MongoDbClient } from "./db/mongodbclient.js";
 
 const app = express();
 const port = process.env.port || 3000;
@@ -196,6 +188,7 @@ app.post(
       //@ts-ignore
       const value = await collection.updateOne(
         { userId: new RegExp(`^${userId}$`, "i") },
+        //@ts-ignore
         { $pull: { cards: cardId } }
       );
 
@@ -203,6 +196,29 @@ app.post(
     } catch (error) {
       console.error("Error removing owned card:", error);
       res.status(500).send({ error: "Failed to remove owned card" });
+    }
+  }
+);
+
+app.post(
+  "/get-card-set-info",
+  async (req: Request<{}, {}, { setName: string; page: number }>, res) => {
+    try {
+      const { setName, page = 1 } = req.body;
+      if (!setName) {
+        return res.status(400).send({ error: "Set name is required" });
+      }
+
+      const num = 50;
+      const offset = (page - 1) * 50;
+
+      const response = await axios.get(
+        `https://db.ygoprodeck.com/api/v7/cardinfo.php?cardset=${setName}&num=${num}&offset=${offset}`
+      );
+
+      res.send(response.data);
+    } catch (error) {
+      res.send([]);
     }
   }
 );
@@ -233,8 +249,50 @@ app.post(
   }
 );
 
-app.get("/auth-url", (req, res) => {
+function paginate(array:any, page = 1, limit = 50) {
+  const offset = (page - 1) * limit;
+  return array.slice(offset, offset + limit);
+}
 
+app.post(
+  "/get-owned-cards-with-details",
+  async (req: Request<{}, {}, { userId: string, page:number, limit:number }>, res) => {
+    try {
+      const { userId, page, limit } = req.body;
+      if (!userId) {
+        return res.status(400).send({ error: "User Id is required" });
+      }
+      const dbClient = await client;
+      const collection = dbClient.db("yugioh").collection("ownedCards");
+      const existingCardsOwned = await collection.findOne({
+        userId: new RegExp(`^${userId}$`, "i"),
+      });
+
+      if (!existingCardsOwned) {
+        return res.send([]);
+      }
+      const cardsWithDetails: any = [];
+     
+
+      const paginatedCardIds = paginate(existingCardsOwned.cards, page, limit);
+      
+      for await (const cardId of paginatedCardIds) {
+        const response = await axios.get(
+          `https://db.ygoprodeck.com/api/v7/cardinfo.php?id=${cardId}`
+        );
+
+         cardsWithDetails.push(response.data.data[0]);
+      }
+
+      res.send(cardsWithDetails);
+    } catch (error) {
+      console.error("Error removing owned card:", error);
+      res.send([]);
+    }
+  }
+);
+
+app.get("/auth-url", (req, res) => {
   const oauth2Client = new google.auth.OAuth2(
     OAUTH_CLIENT_ID,
     OAUTH_CLIENT_SECRET,
@@ -280,7 +338,7 @@ type UserInfo = {
 
 app.post("/get-tokens", async (req: Request<{}, {}, { code: string }>, res) => {
   const { code } = req.body;
- 
+
   const oauth2Client = new google.auth.OAuth2(
     OAUTH_CLIENT_ID,
     OAUTH_CLIENT_SECRET,

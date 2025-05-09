@@ -1,3 +1,3 @@
-import { staticValuesRouter } from "./staticValues";
+import { staticValuesRouter } from "./staticValues.js";
 
 export { staticValuesRouter };

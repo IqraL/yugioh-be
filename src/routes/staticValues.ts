@@ -1,5 +1,12 @@
 import express from "express";
-import { levels, attributes, types, allRaces, archetypes } from "../values";
+import {
+  levels,
+  attributes,
+  types,
+  allRaces,
+  archetypes,
+  cardSets,
+} from "./values.js";
 
 const staticValuesRouter = express.Router();
 
@@ -18,6 +25,12 @@ staticValuesRouter.get("/get-allRaces", (req, res) => {
 });
 staticValuesRouter.get("/get-archetypes", (req, res) => {
   res.send(archetypes);
+});
+
+staticValuesRouter.get("/get-cardSets", (req, res) => {
+  res.send(cardSets.sort((a, b) => {
+    return a.tcg_date > b.tcg_date ? -1 : 1;
+  }).map((set)=>{return set.set_name;}));
 });
 
 export { staticValuesRouter };
